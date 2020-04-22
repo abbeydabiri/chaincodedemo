@@ -4,6 +4,11 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
+//Contract for handling writing and reading from the world state
+type Contract struct {
+	contractapi.Contract
+}
+
 func main() {
 
 	contract := new(Contract)
