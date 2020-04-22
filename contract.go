@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
@@ -30,15 +32,15 @@ type Contract struct {
 }
 
 //Put adds a new key with value to the world state
-func (contract *Contract) Put(ctx contractapi.TransactionContextInterface, mobile string, name string, email string, network string) {
+func (contract *Contract) Put(ctx contractapi.TransactionContextInterface, mobile string, name string, email string, network string) (err error) {
 
 	if mobile == "" {
-		// err = errors.New("Mobile can not be empty")
+		err = errors.New("Mobile can not be empty")
 		return
 	}
 
 	if name == "" {
-		// err = errors.New("Name can not be empty")
+		err = errors.New("Name can not be empty")
 		return
 	}
 
@@ -48,49 +50,45 @@ func (contract *Contract) Put(ctx contractapi.TransactionContextInterface, mobil
 	obj.Email = email
 	obj.Network = network
 
-	// if obj.Created, err = GetTimestamp(ctx); err != nil {
-	// 	return
-	// }
+	if obj.Created, err = GetTimestamp(ctx); err != nil {
+		return
+	}
 
-	// if obj.Createdby, err = GetCallerID(ctx); err != nil {
-	// 	return
-	// }
+	if obj.Createdby, err = GetCallerID(ctx); err != nil {
+		return
+	}
 
 	key := mobile
 	objBytes, _ := json.Marshal(obj)
-	ctx.GetStub().PutState(key, []byte(objBytes))
+	err = ctx.GetStub().PutState(key, []byte(objBytes))
 	return
 }
 
 //Get retrieves the value linked to a key from the world state
-func (contract *Contract) Get(ctx contractapi.TransactionContextInterface, key string) *ContractObj {
+func (contract *Contract) Get(ctx contractapi.TransactionContextInterface, key string) (*ContractObj, error) {
 
 	existingObj, err := ctx.GetStub().GetState(key)
 	if err != nil {
-		return nil
-		// return nil, err
+		return nil, err
 	}
 
 	if existingObj == nil {
-		return nil
-		// return nil, fmt.Errorf("Cannot read world state pair with key %s. Does not exist", key)
+		return nil, fmt.Errorf("Cannot read world state pair with key %s. Does not exist", key)
 	}
 
 	ContractObj := new(ContractObj)
 	if err := json.Unmarshal(existingObj, ContractObj); err != nil {
-		return nil
-		// return nil, fmt.Errorf("Data retrieved from world state for key %s was not of type ContractObj", key)
+		return nil, fmt.Errorf("Data retrieved from world state for key %s was not of type ContractObj", key)
 	}
-	return ContractObj
+	return ContractObj, nil
 }
 
 //History retrieves the history linked to a key from the world state
-func (contract *Contract) History(ctx contractapi.TransactionContextInterface, key string) []ContractHistory {
+func (contract *Contract) History(ctx contractapi.TransactionContextInterface, key string) ([]ContractHistory, error) {
 
 	iter, err := ctx.GetStub().GetHistoryForKey(key)
 	if err != nil {
-		return nil
-		// return nil, err
+		return nil, err
 	}
 	defer func() { _ = iter.Close() }()
 
@@ -98,14 +96,12 @@ func (contract *Contract) History(ctx contractapi.TransactionContextInterface, k
 	for iter.HasNext() {
 		state, err := iter.Next()
 		if err != nil {
-			return nil
-			// return nil, err
+			return nil, err
 		}
 
 		entryObj := new(ContractObj)
 		if errNew := json.Unmarshal(state.Value, entryObj); errNew != nil {
-			return nil
-			// return nil, errNew
+			return nil, errNew
 		}
 
 		entry := ContractHistory{
@@ -116,5 +112,5 @@ func (contract *Contract) History(ctx contractapi.TransactionContextInterface, k
 
 		results = append(results, entry)
 	}
-	return results
+	return results, nil
 }
